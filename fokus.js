@@ -1,5 +1,5 @@
 // ==UserScript==
-// @name         Focus8
+// @name         Snowman-Fokus
 // @namespace    http://tampermonkey.net/
 // @version      1.8
 // @description  Block specified websites with an enable/disable menu and overlay
@@ -227,13 +227,38 @@ function main() {
     const token = await getValue("readwise-key");
     if (!token) {
       notify("Please manually add readwise-key value");
-      return document.createDocumentFragment();
+
+      const form = document.createElement("form");
+      form.innerHTML = `
+        <div style="margin-bottom: 10px;">
+          <label for="readwise-key" style="display: block; margin-bottom: 5px;">Enter your Readwise API key:</label>
+          <input type="text" id="readwise-key" name="readwise-key" required style="width: 100%; padding: 5px;">
+        </div>
+        <button type="submit" style="background-color: #4a90e2; color: white; border: none; padding: 10px 15px; cursor: pointer;">Save</button>
+      `;
+
+      form.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const key = form.querySelector("#readwise-key").value.trim();
+        if (key) {
+          await setValue("readwise-key", key);
+          notify("Readwise API key saved successfully");
+          location.reload();
+        } else {
+          notify("Please enter a valid Readwise API key");
+        }
+      });
+
+      document.body.appendChild(form);
+      return;
     }
 
-    const fetchDailyReview = async () => {
-      const cache = await getValue("highlights", {});
-      if (cache && cache.valid_until > Date.now()) {
-        return cache.highlights;
+    const fetchDailyReview = async (ignoreCache = false) => {
+      if (!ignoreCache) {
+        const cache = await getValue("highlights", {});
+        if (cache && cache.valid_until > Date.now()) {
+          return cache.highlights;
+        }
       }
 
       return new Promise((resolve, reject) => {
@@ -268,37 +293,62 @@ function main() {
         );
     };
 
-    const fragment = document.createDocumentFragment();
+    const insertQuotes = async (element, ignoreCache = false) => {
+      try {
+        let quotesContainer = element.querySelector(".quotes");
+        if (quotesContainer) {
+          quotesContainer.remove();
+        }
+        quotesContainer = document.createElement("div");
+        quotesContainer.className = "quotes";
+        element.insertBefore(quotesContainer, element.firstChild);
 
-    try {
-      const highlights = await fetchDailyReview();
-      const shuffledHighlights = highlights.sort(() => Math.random() - 0.5);
+        const highlights = await fetchDailyReview(ignoreCache);
+        const shuffledHighlights = highlights.sort(() => Math.random() - 0.5);
 
-      shuffledHighlights.forEach((highlight) => {
-        const quoteInstance = document.createElement("div");
-        quoteInstance.className = "quote-card";
-        quoteInstance.innerHTML = `
-          <blockquote>
-            <p>${convertMarkdownToHtml(highlight.text)}
-            <cite>
-              <span class="title">${highlight.title}</span>
-              <span class="author">by ${highlight.author}</span>
-            </cite>
-            </p>
-            <figure>
-              ${
-                highlight.image_url
-                  ? `<img src="${highlight.image_url}" alt="${highlight.title}" onerror="this.style.display='none'">`
-                  : ""
-              }
-            </figure>
-          </blockquote>
-        `;
-        fragment.appendChild(quoteInstance);
-      });
-    } catch (error) {
-      console.error("Error fetching quotes:", error);
-    }
+        shuffledHighlights.forEach((highlight) => {
+          const quoteInstance = document.createElement("div");
+          quoteInstance.className = "quote-card";
+          quoteInstance.innerHTML = `
+            <blockquote>
+              <p>${convertMarkdownToHtml(highlight.text)}
+              <cite>
+                <span class="title">${highlight.title}</span>
+                <span class="author">by ${highlight.author}</span>
+              </cite>
+              </p>
+              <figure>
+                ${
+                  highlight.image_url
+                    ? `<img src="${highlight.image_url}" alt="${highlight.title}" onerror="this.style.display='none'">`
+                    : ""
+                }
+              </figure>
+            </blockquote>
+          `;
+          quotesContainer.appendChild(quoteInstance);
+        });
+      } catch (error) {
+        console.error("Error fetching quotes:", error);
+        element.innerHTML = "Error fetching quotes";
+      }
+    };
+
+    const fragment = document.createElement("div");
+    await insertQuotes(fragment, false);
+
+    // Add refresh button
+    const refreshButton = document.createElement("a");
+    refreshButton.style.cssText =
+      "font-size: 0.8em; color: gray; display: block; text-align: center;";
+    refreshButton.textContent = "(force refresh quotes)";
+    refreshButton.className = "refresh-quotes-btn";
+    refreshButton.href = "#";
+    refreshButton.addEventListener("click", async (e) => {
+      e.preventDefault();
+      insertQuotes(fragment, true);
+    });
+    fragment.appendChild(refreshButton);
 
     return fragment;
   };
@@ -337,7 +387,6 @@ function main() {
 
     const style = document.createElement("style");
     style.textContent = `
-
       :host {
         all: initial;
       }
@@ -374,12 +423,15 @@ function main() {
         display: flex;
         align-items: center;
         margin-bottom: 30px;
-        justify-content: space-between;
+        justify-content: flex-end;
+
       }
 
       .profile {
         display: flex;
         align-items: center;
+        flex-grow: 2;
+
       }
 
       .profile-image {
@@ -477,6 +529,7 @@ function main() {
         text-overflow: ellipsis;
         white-space: nowrap;
       }
+
       .stat-value {
         margin-left: 10px;
         font-weight: 600;
@@ -484,14 +537,15 @@ function main() {
       }
 
       .quick-enable-button {
+        margin: 1px;
         bottom: 20px;
         right: 20px;
         padding: 10px 20px;
         background-color: #4a90e2;
         color: white;
-        border: none;
-        border-radius: 5px;
-        font-size: 16px;
+        border: 1px solid #3a80d2;
+        border-radius: 3px;
+        font-size: 14px;
         cursor: pointer;
         transition: background-color 0.2s ease-in-out;
       }
@@ -525,6 +579,7 @@ function main() {
           </div>
 
           <button class="quick-enable-button">Enable for 5 minutes</button>
+          <button class="quick-enable-button">25</button>
         </div>
         <div class="quote">
           <!-- "Success is not final, failure is not fatal: it is the courage to continue that counts." -->
