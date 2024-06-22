@@ -633,7 +633,9 @@ function main() {
     }
 
     // Register menu commands
-    GM_registerMenuCommand(`Enable for 5 Minutes`, () => exemptFor(5, host));
+    GM_registerMenuCommand(`Enable for 5 Minutes`, () =>
+      exemptFor(5 * 60, host)
+    );
     GM_registerMenuCommand(
       `${blockingEnabled ? "Disable" : "Enable"} Blocking`,
       toggleBlocking
