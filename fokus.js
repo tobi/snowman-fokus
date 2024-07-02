@@ -18,15 +18,20 @@ if (window.self !== window.top) return null;
 function main() {
   "use strict";
 
-  // Utility functions
+  const currentHost = window.location.hostname.replace(/^www\./, "");
+
+  // MARK: Utility functions
   const getValue = (key, defaultValue) => GM_getValue(key, defaultValue);
   const setValue = (key, value) => GM_setValue(key, value);
   const notify = (message, title = "fokus") => GM_notification(message, title);
 
-  // Main functions
   const getBlockedHosts = () => getValue("blockedHosts", []);
   const setBlockedHosts = (hosts) => setValue("blockedHosts", hosts);
-  const getBlockingEnabled = () => getValue("blockingEnabled", false);
+  const isHostInBlocklist = (host) => {
+    const blockedHosts = getBlockedHosts();
+    return blockedHosts.some((e) => host.includes(e));
+  };
+  const getBlockingEnabled = () => getValue("blockingEnabled", true);
   const setBlockingEnabled = (enabled) => setValue("blockingEnabled", enabled);
   const getExemptUntil = () => new Date(getValue("exemptUntil_global", 0));
   const setExemptUntil = (until) =>
@@ -61,21 +66,21 @@ function main() {
   const setBlockCounts = (counts) => setValue("blockCounts", counts);
 
   const invalidateState = () => {
+    main();
+  };
+
+  const toggleBlocking = () => {
+    const newState = !getBlockingEnabled();
+    setBlockingEnabled(newState);
+    notify(`Blocking is now ${newState ? "enabled" : "disabled"}.`);
     window.location.reload();
   };
 
-  const toggleBlocking = async () => {
-    const newState = !(await getBlockingEnabled());
-    await setBlockingEnabled(newState);
-    notify(`Blocking is now ${newState ? "enabled" : "disabled"}.`);
-    invalidateState();
-  };
-
-  const addBlockedHost = async (host) => {
-    const blockedHosts = await getBlockedHosts();
+  const addBlockedHost = (host) => {
+    const blockedHosts = getBlockedHosts();
     if (!blockedHosts.includes(host)) {
       blockedHosts.push(host);
-      await setBlockedHosts(blockedHosts);
+      setBlockedHosts(blockedHosts);
       notify(`${host} added to blocked hosts.`);
     } else {
       notify(`${host} is already in the blocked hosts list.`);
@@ -94,29 +99,44 @@ function main() {
     }
   };
 
-  const blockCurrentPage = async () => {
-    const host = window.location.hostname.replace(/^www\./, "");
-    await addBlockedHost(host);
+  const blockCurrentPage = () => {
+    addBlockedHost(currentHost);
     invalidateState();
   };
 
-  const unblockCurrentPage = async () => {
-    const host = window.location.hostname.replace(/^www\./, "");
-    await removeBlockedHost(host);
+  const unblockCurrentPage = () => {
+    removeBlockedHost(currentHost);
     invalidateState();
   };
 
-  const exemptFor = async (seconds, host) => {
+  const exemptFor = (seconds, host) => {
     const exemptUntil = new Date(Date.now() + seconds * 1000);
-    await setExemptUntil(exemptUntil);
-    await updateExemptionCount(host);
+    setExemptUntil(exemptUntil);
+    updateExemptionCount(host);
     invalidateState();
   };
 
+  const blockingEnabled = getBlockingEnabled();
+  const exemptUntil = getExemptUntil();
+  const isTemporaryExempt = exemptUntil > new Date();
+  const isBlockedHost = isHostInBlocklist(currentHost) && blockingEnabled;
+
+  // MARK: Components/Countdown
   const createCountdownToast = async () => {
-    const host = document.createElement("span", {
-      id: "fokus-countdown-toast",
-    });
+    const toastElement = document.getElementById("fokus-countdown-toast");
+    if (toastElement) toastElement.remove();
+
+    if (!isBlockedHost) {
+      return;
+    }
+
+    if (!isTemporaryExempt) {
+      return;
+    }
+
+    const host = document.createElement("span");
+    host.id = "fokus-countdown-toast";
+
     const shadowRoot = host.attachShadow({ mode: "closed" });
 
     const toast = document.createElement("div");
@@ -183,6 +203,7 @@ function main() {
         color: #ff0000;
         animation: pop 0.3s ease infinite;
       }
+
     `;
 
     shadowRoot.appendChild(style);
@@ -193,33 +214,30 @@ function main() {
       invalidateState();
     });
 
-    const updateCountdown = async () => {
-      const exemptUntil = await getExemptUntil();
+    const updateCountdown = () => {
+      const exemptUntil = getExemptUntil();
       let duration = Math.floor((exemptUntil - new Date()) / 1000);
 
-      if (duration <= 0) {
-        invalidateState();
-        return;
-      }
-
-      if (duration <= 15) {
+      if (duration <= 20) {
         toast.classList.add("urgent");
       }
 
-      const minutes = Math.floor(duration / 60);
-      const seconds = duration % 60;
-      toast.textContent = `${minutes}:${seconds.toString().padStart(2, "0")}`;
-
-      requestAnimationFrame(updateCountdown);
+      if (duration <= 0) {
+        toast.textContent = "EXPIRED";
+        setTimeout(() => {
+          invalidateState();
+        }, 1000);
+        return;
+      } else {
+        const minutes = Math.floor(duration / 60);
+        const seconds = duration % 60;
+        toast.textContent = `${minutes}:${seconds.toString().padStart(2, "0")}`;
+        setTimeout(updateCountdown, 500);
+      }
     };
 
     updateCountdown();
 
-    // Find and remove the existing countdown element
-    const existingCountdown = document.getElementById("fokus-countdown-toast");
-    if (existingCountdown) {
-      existingCountdown.remove();
-    }
     document.body.appendChild(host);
   };
 
@@ -231,9 +249,10 @@ function main() {
       const form = document.createElement("form");
       form.innerHTML = `
         <div style="margin-bottom: 10px;">
-          <label for="readwise-key" style="display: block; margin-bottom: 5px;">Enter your Readwise API key:</label>
+          <label for="readwise-key" style="display: block; margin-bottom: 5px;">Enter your Readwise API key: (get it <a href="https://readwise.io/access_token">here</a>)</label>
           <input type="text" id="readwise-key" name="readwise-key" required style="width: 100%; padding: 5px;">
         </div>
+
         <button type="submit" style="background-color: #4a90e2; color: white; border: none; padding: 10px 15px; cursor: pointer;">Save</button>
       `;
 
@@ -249,8 +268,7 @@ function main() {
         }
       });
 
-      document.body.appendChild(form);
-      return;
+      return form;
     }
 
     const fetchDailyReview = async (ignoreCache = false) => {
@@ -379,9 +397,17 @@ function main() {
     return fragment;
   };
 
+  // MARK: Components/Blocked Overlay
   const createBlockedOverlay = async () => {
+    const overlayElement = document.getElementById("fokus-blocked-overlay");
+    if (overlayElement) overlayElement.remove();
+
+    if (isBlockedHost && isTemporaryExempt) {
+      return;
+    }
+
     const overlay = document.createElement("div");
-    overlay.id = "blocked-overlay";
+    overlay.id = "fokus-blocked-overlay";
 
     const shadowRoot = overlay.attachShadow({ mode: "closed" });
 
@@ -538,8 +564,6 @@ function main() {
 
       .quick-enable-button {
         margin: 1px;
-        bottom: 20px;
-        right: 20px;
         padding: 10px 20px;
         background-color: #4a90e2;
         color: white;
@@ -548,6 +572,9 @@ function main() {
         font-size: 14px;
         cursor: pointer;
         transition: background-color 0.2s ease-in-out;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
       }
 
       .quick-enable-button:hover {
@@ -578,8 +605,9 @@ function main() {
           </div>
           </div>
 
-          <button class="quick-enable-button">Enable for 5 minutes</button>
-          <button class="quick-enable-button">25</button>
+
+          <button class="quick-enable-button" data-time="300">Enable for 5 minutes</button>
+          <button class="quick-enable-button" data-time="1500">25</button>
         </div>
         <div class="quote">
           <!-- "Success is not final, failure is not fatal: it is the courage to continue that counts." -->
@@ -594,10 +622,12 @@ function main() {
 
     const statsContainer = content.querySelector(".stats");
     const quotesContainer = content.querySelector(".quotes");
-    const quickEnableButton = content.querySelector(".quick-enable-button");
-    quickEnableButton.addEventListener("click", async () => {
-      const host = window.location.hostname.replace(/^www\./, "");
-      await exemptFor(5 * 60, host);
+
+    content.querySelectorAll(".quick-enable-button").forEach((button) => {
+      button.addEventListener("click", async () => {
+        const host = window.location.hostname.replace(/^www\./, "");
+        await exemptFor(parseInt(button.getAttribute("data-time")), host);
+      });
     });
 
     const stats = await renderStats();
@@ -606,45 +636,29 @@ function main() {
     statsContainer.appendChild(stats);
     quotesContainer.appendChild(quotes);
 
-    const existingOverlay = document.getElementById("blocked-overlay");
-    if (existingOverlay) {
-      existingOverlay.remove();
-    }
-
     document.body.appendChild(overlay);
   };
 
-  // Main execution
-  (async () => {
-    const host = window.location.hostname.replace(/^www\./, "");
-    const blockedHosts = await getBlockedHosts();
-    const blockingEnabled = await getBlockingEnabled();
-    const exemptUntil = await getExemptUntil();
+  // MARK: Main
+  if (isBlockedHost && !isTemporaryExempt) {
+    updateBlockCount(currentHost);
+  }
 
-    let isBlocked =
-      blockedHosts.some((e) => host.includes(e)) && blockingEnabled;
+  createCountdownToast();
+  createBlockedOverlay();
 
-    if (exemptUntil > new Date()) {
-      createCountdownToast();
-    } else if (isBlocked) {
-      document.documentElement.innerHTML = "";
-      updateBlockCount(host);
-      createBlockedOverlay();
-    }
-
-    // Register menu commands
-    GM_registerMenuCommand(`Enable for 5 Minutes`, () =>
-      exemptFor(5 * 60, host)
-    );
-    GM_registerMenuCommand(
-      `${blockingEnabled ? "Disable" : "Enable"} Blocking`,
-      toggleBlocking
-    );
-    GM_registerMenuCommand(
-      isBlocked ? `Unblock ${host}` : `Block ${host}`,
-      isBlocked ? unblockCurrentPage : blockCurrentPage
-    );
-  })();
+  // Register menu commands
+  GM_registerMenuCommand(`Enable for 5 Minutes`, () =>
+    exemptFor(5 * 60, currentHost)
+  );
+  GM_registerMenuCommand(
+    `${blockingEnabled ? "Disable" : "Enable"} Blocking`,
+    toggleBlocking
+  );
+  GM_registerMenuCommand(
+    isBlockedHost ? `Unblock ${currentHost}` : `Block ${currentHost}`,
+    isBlockedHost ? unblockCurrentPage : blockCurrentPage
+  );
 }
 
 main();
