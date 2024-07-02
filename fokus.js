@@ -338,7 +338,7 @@ function main() {
               <figure>
                 ${
                   highlight.image_url
-                    ? `<img src="${highlight.image_url}" alt="${highlight.title}" onerror="this.style.display='none'">`
+                    ? `<img src="${highlight.image_url}" alt="${highlight.title}" hidden onload="this.hidden = false;">`
                     : ""
                 }
               </figure>
@@ -402,7 +402,11 @@ function main() {
     const overlayElement = document.getElementById("fokus-blocked-overlay");
     if (overlayElement) overlayElement.remove();
 
-    if (isBlockedHost && isTemporaryExempt) {
+    if (!isBlockedHost) {
+      return;
+    }
+
+    if (isTemporaryExempt) {
       return;
     }
 
@@ -414,11 +418,11 @@ function main() {
     const style = document.createElement("style");
     style.textContent = `
       :host {
-        all: initial;
+        all: unset;
       }
-
       .blocked-container {
         position: fixed;
+        color: black;
         top: 0;
         left: 0;
         width: 100%;
@@ -457,7 +461,6 @@ function main() {
         display: flex;
         align-items: center;
         flex-grow: 2;
-
       }
 
       .profile-image {
@@ -595,16 +598,15 @@ function main() {
       <section>
         <div class="header">
           <div class="profile">
-          <figure class="profile-image">
-            ☃︎
-          </figure>
+            <figure class="profile-image">
+              ☃︎
+            </figure>
 
-          <div class="profile-info">
-            <h1>Snowman says no</h1>
-            <p>Stay Focused &amp; stay frosty...</p>
+            <div class="profile-info">
+              <h1>Snowman says no</h1>
+              <p>Stay Focused &amp; stay frosty...</p>
+            </div>
           </div>
-          </div>
-
 
           <button class="quick-enable-button" data-time="300">Enable for 5 minutes</button>
           <button class="quick-enable-button" data-time="1500">25</button>
@@ -626,7 +628,7 @@ function main() {
     content.querySelectorAll(".quick-enable-button").forEach((button) => {
       button.addEventListener("click", async () => {
         const host = window.location.hostname.replace(/^www\./, "");
-        await exemptFor(parseInt(button.getAttribute("data-time")), host);
+        exemptFor(parseInt(button.getAttribute("data-time")), host);
       });
     });
 
