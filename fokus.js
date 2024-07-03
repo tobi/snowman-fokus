@@ -420,6 +420,7 @@ function main() {
       :host {
         all: unset;
       }
+
       .blocked-container {
         position: fixed;
         color: black;
@@ -454,7 +455,6 @@ function main() {
         align-items: center;
         margin-bottom: 30px;
         justify-content: flex-end;
-
       }
 
       .profile {
@@ -474,16 +474,19 @@ function main() {
         margin-right: 20px;
         box-shadow: 0 1px 1px rgba(0, 0, 0, 0.1);
       }
+
       .profile-info h1 {
         margin: 0;
         font-size: 28px;
         font-weight: 600;
       }
+
       .profile-info p {
         margin: 5px 0 0;
         color: #4a90e2;
         font-size: 18px;
       }
+
       .quote {
         font-style: italic;
         color: #555;
@@ -491,9 +494,11 @@ function main() {
         line-height: 1.6;
         font-size: 15px;
       }
+
       .stats, .quotes {
         margin-top: 30px;
       }
+
       .quote-card {
         background-color: white;
         border-radius: 8px;
@@ -502,9 +507,11 @@ function main() {
         box-shadow: 0 1px 1px rgba(0, 0, 0, 0.1);
         transition: transform 0.2s ease-in-out;
       }
+
       .quote-card:hover {
         transform: translateY(-5px);
       }
+
       blockquote {
         display: flex;
         align-items: flex-start;
@@ -513,12 +520,14 @@ function main() {
         border-left: 3px solid #4a90e2;
         justify-content: space-between;
       }
+
       blockquote p {
         margin: 0 0 10px;
         line-height: 1.5;
         flex: 1 1 auto;
         padding-right: 15px;
       }
+
       blockquote figure {
         border-radius: 4px;
         box-shadow: 0 2px 2px rgba(0, 0, 0, 0.4);
@@ -538,9 +547,11 @@ function main() {
         font-size: 0.9em;
         color: #777;
       }
+
       .title {
         font-weight: 600;
       }
+
       .stat-item {
         display: flex;
         align-items: center;
@@ -550,8 +561,8 @@ function main() {
         border-radius: 6px;
         #box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
         box-shadow: 0 1px 1px rgba(0, 0, 0, 0.1);
-
       }
+
       .stat-label {
         flex: 1;
         overflow: hidden;
@@ -585,11 +596,72 @@ function main() {
         transform: scale(1.01);
         transition: all 0.2s ease-in-out;
       }
+
       .quick-enable-button:active {
         transform: scale(0.95);
         box-shadow: 0 0 10px rgba(0,0,0,0.3) inset;
       }
 
+      /* Dark Mode */
+      @media (prefers-color-scheme: dark) {
+        .blocked-container {
+          background-color: #333;
+          background-image: linear-gradient(43deg, #000 0%, #162a41 46%, #161616 100%);
+          color: white;
+        }
+          
+        section {
+          background-color: #222;
+        }
+
+        .profile-image {
+          background: black;
+          box-shadow: 0 1px 1px rgba(255, 255, 255, 0.1);
+        }
+
+        .profile-info p {
+          color: #4a90e2;
+        }
+
+        .quote {
+          color: #aaa;
+        }
+
+        .quote-card {
+          background-color: #333;
+          box-shadow: 0 1px 1px rgba(255, 255, 255, 0.1);
+        }
+
+        blockquote {
+          border-left: 3px solid #4a90e2;
+        }
+
+        cite {
+          color: #777;
+        }
+
+        .stat-item {
+          background-color: #333;
+          box-shadow: 0 1px 1px rgba(255, 255, 255, 0.1);
+        }
+
+        .stat-label {
+          color: #aaa;
+        }
+
+        .stat-value {
+          color: #4a90e2;
+        }
+          
+        .quick-enable-button {
+          background-color: #4a90e2;
+          border: 1px solid #3a80d2;
+        }
+
+        .quick-enable-button:hover {
+          background-color: #357abd;
+        }
+      }
     `;
 
     const content = document.createElement("div");
